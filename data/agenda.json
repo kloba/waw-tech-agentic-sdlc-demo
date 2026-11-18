@@ -1,0 +1,14 @@
+{
+  "event": "Demo Conf 2026 (fictional data)",
+  "talks": [
+    {"id": "t1", "title": "Opening: agents on every step of the SDLC", "speaker": "Mia Fixture", "room": "Main", "track": "AI", "start": "2026-11-26T09:00", "end": "2026-11-26T09:30"},
+    {"id": "t2", "title": "Spec-driven development in practice", "speaker": "Piotr Sample", "room": "Main", "track": "Platform", "start": "2026-11-26T09:30", "end": "2026-11-26T10:15"},
+    {"id": "t3", "title": "Hands-on: your first agentic workflow", "speaker": "Lena Mock", "room": "Lab", "track": "AI", "start": "2026-11-26T09:30", "end": "2026-11-26T10:15"},
+    {"id": "t4", "title": "Prompt injection in issue trackers", "speaker": "Oksana Example", "room": "Main", "track": "Security", "start": "2026-11-26T10:15", "end": "2026-11-26T11:00"},
+    {"id": "t5", "title": "Postgres for vector search", "speaker": "Tom Stub", "room": "Lab", "track": "Data", "start": "2026-11-26T10:30", "end": "2026-11-26T11:15"},
+    {"id": "t6", "title": "Rulesets that agents respect", "speaker": "Zofia Placeholder", "room": "Expo", "track": "Platform", "start": "2026-11-26T11:00", "end": "2026-11-26T11:45"},
+    {"id": "t7", "title": "Lightning: dashboards for AI credits", "speaker": "Ivan Dummy", "room": "Expo", "track": "Data", "start": "2026-11-26T11:30", "end": "2026-11-26T12:00"},
+    {"id": "t8", "title": "Panel: who merges the agent's PR?", "speaker": "Ben Fakeman and friends", "room": "Main", "track": "AI", "start": "2026-11-26T11:15", "end": "2026-11-26T12:00"},
+    {"id": "t9", "title": "Testing agents with evals", "speaker": "Ada Sandbox", "room": "Lab", "track": "AI", "start": "2026-11-26T12:00", "end": "2026-11-26T12:30"}
+  ]
+}

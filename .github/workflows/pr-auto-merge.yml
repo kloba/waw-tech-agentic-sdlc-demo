@@ -1,0 +1,66 @@
+name: PR Auto-Merge
+
+# Factory lane: merge a PR once the PR Reviewer gate labeled it ready-to-merge and
+# the required "test" check is green. No human click.
+#
+# Labels added by the PR Reviewer (GITHUB_TOKEN) don't trigger pull_request events,
+# so we listen for the reviewer and CI runs finishing. Humans can also add the label.
+# Adapted from github.com/kloba/github-agentic-workflows-demo.
+
+on:
+  workflow_run:
+    workflows: ["PR Reviewer", "CI"]
+    types: [completed]
+    branches: ["fix/**"]   # factory branches only — never Copilot's PRs
+  pull_request:
+    types: [labeled]
+
+permissions: {}
+
+concurrency:
+  group: pr-auto-merge-${{ github.event.pull_request.number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+    timeout-minutes: 5
+    steps:
+      - name: Merge when ready-to-merge and CI is green
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_FROM_EVENT: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            PR="$PR_FROM_EVENT"
+          else
+            PR=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')
+          fi
+          if [ -z "${PR:-}" ]; then echo "No open PR for this event."; exit 0; fi
+
+          DATA=$(gh pr view "$PR" --repo "$REPO" --json state,isDraft,labels,headRefOid,headRepositoryOwner)
+          LABELS=$(echo "$DATA" | jq -r '[.labels[].name] | join(",")')
+          echo "PR #$PR labels: $LABELS"
+          case ",$LABELS," in *",ready-to-merge,"*) ;; *) echo "Not labeled ready-to-merge."; exit 0 ;; esac
+          case ",$LABELS," in *",needs-rework,"*|*",do-not-merge,"*) echo "Blocked by a label."; exit 0 ;; esac
+          if [ "$(echo "$DATA" | jq -r .isDraft)" = "true" ]; then echo "Draft PR."; exit 0; fi
+          if [ "$(echo "$DATA" | jq -r .headRepositoryOwner.login)" != "${REPO%%/*}" ]; then echo "Fork PR."; exit 0; fi
+
+          SHA=$(echo "$DATA" | jq -r .headRefOid)
+          CI=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=test" \
+            --jq '[.check_runs[].conclusion] | if length == 0 then "missing" elif all(. == "success") then "success" elif any(. == "failure") then "failure" else "pending" end')
+          echo "Check 'test' on $SHA: $CI"
+          case "$CI" in
+            success) gh pr merge "$PR" --repo "$REPO" --squash --delete-branch ;;
+            failure) echo "CI failed; not merging." ;;
+            *) echo "CI not finished; enabling auto-merge so GitHub merges when it's green."
+               gh pr merge "$PR" --repo "$REPO" --squash --auto --delete-branch ;;
+          esac

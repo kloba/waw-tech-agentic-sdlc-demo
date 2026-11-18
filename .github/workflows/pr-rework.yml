@@ -1,0 +1,53 @@
+name: PR Rework
+
+# Factory lane: when the PR Reviewer labels a PR needs-rework, close it and run the
+# Issue Fixer again on the linked issue — at most MAX_RETRIES times, then hand the
+# issue to a human. Adapted from github.com/kloba/github-agentic-workflows-demo.
+
+on:
+  workflow_run:
+    workflows: ["PR Reviewer"]
+    types: [completed]
+    branches: ["fix/**"]
+
+permissions: {}
+
+jobs:
+  rework:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      issues: write
+      pull-requests: write
+    timeout-minutes: 5
+    steps:
+      - name: Close the PR and retry the fix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          MAX_RETRIES: "2"
+        run: |
+          set -euo pipefail
+          PR=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')
+          if [ -z "$PR" ]; then echo "No open PR."; exit 0; fi
+          DATA=$(gh pr view "$PR" --repo "$REPO" --json labels,body)
+          if ! echo "$DATA" | jq -e '[.labels[].name] | index("needs-rework")' >/dev/null; then
+            echo "PR #$PR is not marked needs-rework."; exit 0
+          fi
+          ISSUE=$(echo "$DATA" | jq -r .body | grep -oiE '(fixes|closes|resolves) #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
+          if [ -z "$ISSUE" ]; then echo "PR #$PR has no linked issue."; exit 0; fi
+
+          TRIES=$(gh issue view "$ISSUE" --repo "$REPO" --json labels --jq '[.labels[].name | select(startswith("auto-fix-retry-"))] | length')
+          gh pr close "$PR" --repo "$REPO" --delete-branch --comment "Closed by PR Rework: the PR Reviewer asked for changes."
+          if [ "$TRIES" -ge "$MAX_RETRIES" ]; then
+            gh issue edit "$ISSUE" --repo "$REPO" --add-label needs-human
+            gh issue comment "$ISSUE" --repo "$REPO" --body "Auto-fix stopped after $TRIES retries. Over to a human."
+            exit 0
+          fi
+          NEXT=$((TRIES + 1))
+          gh label create "auto-fix-retry-$NEXT" --repo "$REPO" --color BFD4F2 --force >/dev/null
+          gh issue edit "$ISSUE" --repo "$REPO" --add-label "auto-fix-retry-$NEXT"
+          gh workflow run issue-fixer.lock.yml --repo "$REPO" -f issue_number="$ISSUE"
+          echo "Retry $NEXT of $MAX_RETRIES started for issue #$ISSUE."
