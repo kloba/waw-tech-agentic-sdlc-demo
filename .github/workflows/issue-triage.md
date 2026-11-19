@@ -44,7 +44,7 @@ Triage issue **#${{ github.event.issue.number }}** in `${{ github.repository }}`
 Call `noop` with a one-line reason and stop if the issue:
 
 - is a status report (label `report` or a title starting with `[repo status]`);
-- already has `auto-fix`, `agent-ready`, `needs-info`, `needs-human` or `do-not-fix`;
+- already has `auto-fix`, `agent-ready`, `needs-info`, `needs-human`, `do-not-fix` or `staged` (seed issues kept for the live demo);
 - is referenced by an open pull request.
 
 ## 2. Understand it
