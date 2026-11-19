@@ -3,8 +3,9 @@ name: PR Auto-Merge
 # Factory lane: merge a PR once the PR Reviewer gate labeled it ready-to-merge and
 # the required "test" check is green. No human click.
 #
-# Labels added by the PR Reviewer (GITHUB_TOKEN) don't trigger pull_request events,
-# so we listen for the reviewer and CI runs finishing. Humans can also add the label.
+# We listen for the reviewer and CI runs finishing as well as for the label itself;
+# humans can also add the label. The merge uses the factory token (GH_AW_GITHUB_TOKEN)
+# when it is set, so the push to main starts CI there and CI Doctor sees failures.
 # Adapted from github.com/kloba/github-agentic-workflows-demo.
 
 on:
@@ -32,7 +33,7 @@ jobs:
     steps:
       - name: Merge when ready-to-merge and CI is green
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           PR_FROM_EVENT: ${{ github.event.pull_request.number }}
