@@ -1,16 +1,21 @@
 name: PR Rework
 
-# Factory lane: when the PR Reviewer labels a PR needs-rework, close it and run the
-# Issue Fixer again on the linked issue — at most MAX_RETRIES times, then hand the
-# issue to a human. Adapted from github.com/kloba/github-agentic-workflows-demo.
+# Factory lane: when the PR Reviewer labels a fix PR needs-rework, or CI fails on it,
+# close it and run the Issue Fixer again on the linked issue — at most MAX_RETRIES
+# times, then hand the issue to a human. Adapted from github.com/kloba/github-agentic-workflows-demo.
 
 on:
   workflow_run:
-    workflows: ["PR Reviewer"]
+    workflows: ["PR Reviewer", "CI"]
     types: [completed]
     branches: ["fix/**"]
 
 permissions: {}
+
+# The reviewer and CI can finish on the same commit; handle them one at a time.
+concurrency:
+  group: pr-rework-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
 
 jobs:
   rework:
@@ -27,27 +32,38 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           MAX_RETRIES: "2"
         run: |
           set -euo pipefail
           PR=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")][0].number // empty')
           if [ -z "$PR" ]; then echo "No open PR."; exit 0; fi
           DATA=$(gh pr view "$PR" --repo "$REPO" --json labels,body)
-          if ! echo "$DATA" | jq -e '[.labels[].name] | index("needs-rework")' >/dev/null; then
+          if ! echo "$DATA" | jq -e '[.labels[].name] | index("automated-fix")' >/dev/null; then
+            echo "PR #$PR wasn't opened by the Issue Fixer."; exit 0
+          fi
+          if [ "$WORKFLOW" = "CI" ]; then
+            if [ "$CONCLUSION" != "failure" ]; then echo "CI didn't fail."; exit 0; fi
+            REASON="CI failed on it"
+          elif echo "$DATA" | jq -e '[.labels[].name] | index("needs-rework")' >/dev/null; then
+            REASON="the PR Reviewer asked for changes"
+          else
             echo "PR #$PR is not marked needs-rework."; exit 0
           fi
           ISSUE=$(echo "$DATA" | jq -r .body | grep -oiE '(fixes|closes|resolves) #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
           if [ -z "$ISSUE" ]; then echo "PR #$PR has no linked issue."; exit 0; fi
 
           TRIES=$(gh issue view "$ISSUE" --repo "$REPO" --json labels --jq '[.labels[].name | select(startswith("auto-fix-retry-"))] | length')
-          gh pr close "$PR" --repo "$REPO" --delete-branch --comment "Closed by PR Rework: the PR Reviewer asked for changes."
+          gh pr close "$PR" --repo "$REPO" --delete-branch --comment "Closed by PR Rework: $REASON."
           if [ "$TRIES" -ge "$MAX_RETRIES" ]; then
             gh issue edit "$ISSUE" --repo "$REPO" --add-label needs-human
-            gh issue comment "$ISSUE" --repo "$REPO" --body "Auto-fix stopped after $TRIES retries. Over to a human."
+            gh issue comment "$ISSUE" --repo "$REPO" --body "Auto-fix stopped after $TRIES retries ($REASON on #$PR). Over to a human."
             exit 0
           fi
           NEXT=$((TRIES + 1))
           gh label create "auto-fix-retry-$NEXT" --repo "$REPO" --color BFD4F2 --force >/dev/null
           gh issue edit "$ISSUE" --repo "$REPO" --add-label "auto-fix-retry-$NEXT"
+          gh issue comment "$ISSUE" --repo "$REPO" --body "Retry $NEXT of $MAX_RETRIES: closed #$PR because $REASON. The next attempt should read that PR's review and checks first."
           gh workflow run issue-fixer.lock.yml --repo "$REPO" -f issue_number="$ISSUE"
-          echo "Retry $NEXT of $MAX_RETRIES started for issue #$ISSUE."
+          echo "Retry $NEXT of $MAX_RETRIES started for issue #$ISSUE ($REASON)."

@@ -1,9 +1,9 @@
 ---
 name: Issue Fixer
 description: |
-  Factory lane. When a maintainer labels an issue auto-fix, the agent fixes it,
-  adds a regression test and opens a PR labeled awaiting-review for the PR Reviewer gate.
-  Adapted from github.com/kloba/github-agentic-workflows-demo.
+  Factory lane. When an issue is labeled auto-fix (by Issue Triage or a maintainer), the
+  agent fixes it, adds a regression test and opens a PR labeled awaiting-review for the
+  PR Reviewer gate. Adapted from github.com/kloba/github-agentic-workflows-demo.
 
 on:
   issues:
@@ -75,7 +75,7 @@ safe-outputs:
 
 # Issue Fixer
 
-A maintainer asked you to fix issue **#${{ github.event.issue.number || inputs.issue_number }}** in `${{ github.repository }}` without further help. The **PR Reviewer** workflow will review your PR and either label it `ready-to-merge` (then it merges automatically once CI is green) or `needs-rework` (then you get one more try).
+Issue **#${{ github.event.issue.number || inputs.issue_number }}** in `${{ github.repository }}` was routed to the factory (label `auto-fix`). Fix it without further help: nobody is watching. The **PR Reviewer** workflow will review your PR and either label it `ready-to-merge` (then it merges automatically once CI is green) or `needs-rework`. If the reviewer rejects it or CI fails, **PR Rework** closes the PR and runs you again, at most twice; read the issue comments and the closed PRs for what went wrong last time.
 
 ## 1. Check that you should act
 

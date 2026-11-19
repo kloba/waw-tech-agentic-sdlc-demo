@@ -1,9 +1,9 @@
 ---
 name: Agent Dispatcher
 description: |
-  Product lane. When a maintainer labels an issue agent-ready, check that it is
-  specific enough and hand it to the Copilot cloud agent. Copilot opens a draft PR;
-  a human still reviews and merges it.
+  Product lane. When an issue is labeled agent-ready (by Issue Triage or a maintainer),
+  check that it is specific enough and hand it to the Copilot cloud agent. Copilot opens
+  a draft PR; a human still reviews and merges it.
 
 on:
   issues:
@@ -54,7 +54,7 @@ safe-outputs:
 
 # Agent Dispatcher
 
-A maintainer marked issue **#${{ github.event.issue.number || inputs.issue_number }}** in `${{ github.repository }}` as `agent-ready`. Decide whether the Copilot cloud agent can do it without asking questions, then hand it over.
+Issue **#${{ github.event.issue.number || inputs.issue_number }}** in `${{ github.repository }}` was labeled `agent-ready`. Decide whether the Copilot cloud agent can do it without asking questions, then hand it over.
 
 1. Read the issue (title, body, labels, comments) with the GitHub tools.
 2. It is **ready** when the expected behaviour is clear enough to write a test for it and the change touches only a few files.

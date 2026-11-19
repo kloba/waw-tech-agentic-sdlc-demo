@@ -45,7 +45,7 @@ The **CI** run ${{ github.event.workflow_run.html_url }} failed on commit `${{ g
 
 1. List the jobs of run ${{ github.event.workflow_run.id }} and read the logs of the failed steps.
 2. Find the **first real error** (a failing test, a lint error, an install problem) and the file and line it points to.
-3. If the run belongs to an open pull request, add one comment on that PR. Otherwise open one issue. In both cases write:
+3. If the run belongs to an open pull request, add one comment on that PR (for `fix/*` PRs, PR Rework closes the PR and retries the fix on its own). Otherwise open one issue; Issue Triage routes it, so the factory may fix it without a human. In both cases write:
    - **Failing step:** name of the job and step
    - **Root cause:** 1–3 sentences, quoting the key log line
    - **Suggested fix:** the smallest change that should make CI green
